@@ -243,15 +243,24 @@ input::placeholder,textarea::placeholder{color:var(--sub);opacity:.6}
 .fetch-status.ok{color:var(--success)}
 .fetch-status.warn{color:var(--warn)}
 
-/* ── Bans ── */
-.ban-item{
-  display:flex;align-items:center;justify-content:space-between;
+/* ── Users ── */
+.u-card{
+  display:flex;align-items:center;gap:12px;
   background:var(--raised);border:1px solid var(--border);
-  border-radius:var(--r);padding:10px 13px;margin-top:6px;
-  font-size:12.5px;font-family:var(--mono);
+  border-radius:var(--r);padding:12px 14px;margin-top:6px;
+  transition:border-color var(--t);
+  cursor:pointer;
 }
-.ban-item .bid{color:var(--text)}
-.ban-item .bdate{color:var(--sub);font-size:10.5px;margin-left:10px}
+.u-card:hover{border-color:var(--border-hi)}
+.u-card .u-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.u-card .u-dot.active{background:var(--success);box-shadow:0 0 6px var(--success)}
+.u-card .u-dot.banned{background:var(--danger);box-shadow:0 0 6px var(--danger)}
+.u-card .u-info{flex:1;min-width:0}
+.u-card .u-email{font-weight:600;font-size:13px;color:var(--text)}
+.u-card .u-meta{font-size:10.5px;font-family:var(--mono);color:var(--sub);margin-top:2px;display:flex;gap:12px;flex-wrap:wrap}
+.u-card .u-meta span{display:flex;align-items:center;gap:4px}
+.u-card .u-actions{display:flex;gap:6px;flex-shrink:0}
+.u-card .u-sharing{color:var(--danger);font-size:10px;font-family:var(--mono);background:rgba(255,79,106,.1);padding:1px 6px;border-radius:4px}
 
 /* ── Logs ── */
 .log-entry{
@@ -477,19 +486,14 @@ input::placeholder,textarea::placeholder{color:var(--sub);opacity:.6}
     </div>
   </div>
 
-  <!-- Bans -->
+  <!-- Users -->
   <div class="section">
     <div class="section-header">
-      <span class="section-title">Banned Users</span>
+      <span class="section-title">Users</span>
+      <button class="btn btn-ghost btn-xs" onclick="loadUsers()" id="usersRefreshBtn">Refresh</button>
     </div>
-    <div class="row">
-      <div class="field" style="margin-bottom:0">
-        <label>User Local ID</label>
-        <input type="text" id="banUserId" placeholder="Paste localId here…" style="margin-bottom:0">
-      </div>
-      <button class="btn btn-danger" onclick="banUser()" style="align-self:flex-end">Ban</button>
-    </div>
-    <div id="bannedList" class="mt-8"></div>
+    <input type="text" id="usersSearch" placeholder="Search by email or localId…" oninput="renderUsers()">
+    <div id="usersList"></div>
   </div>
 
   <!-- Logs -->
@@ -523,6 +527,7 @@ const ADMIN_UID = _$_([82,110,111,106,118,12,13,80,109,117,108,8,114,106,118,109
 
 /* ── State ── */
 let token = null, userMail = null, editIdx = -1, annCache = [];
+let logData = [], logFilter = 'all', userCache = [], bannedCache = {};
 
 /* ── Utils ── */
 const $  = id => document.getElementById(id);
@@ -596,7 +601,7 @@ async function dbPut(path, data) {
   return r.json();
 }
 
-function loadAll() { return Promise.all([loadStatus(), loadAnn(), loadDiscord(), loadLogs(), loadBans()]); }
+function loadAll() { Promise.all([loadStatus(), loadAnn(), loadDiscord(), loadLogs()]).then(() => loadUsers()); }
 
 /* ── Status ── */
 async function loadStatus() {
@@ -749,45 +754,76 @@ async function saveDiscord() {
   catch { toast('Failed to save Discord link', 'error'); }
 }
 
-/* ── Bans ── */
-async function loadBans() {
-  try {
-    const d = await dbGet('/banned');
-    const list = $('bannedList');
-    if (!d || !Object.keys(d).length) {
-      list.innerHTML = '<div class="empty-state"><span>◎</span>No banned users</div>';
-      return;
-    }
-    list.innerHTML = Object.entries(d).map(([id, val]) =>
-      `<div class="ban-item">
-        <span class="bid">${esc(id)}</span>
-        <button class="btn btn-ghost btn-xs" onclick="unbanUser('${id}')" style="color:var(--danger)">Unban</button>
-      </div>`
-    ).join('');
-  } catch { $('bannedList').innerHTML = '<div class="empty-state"><span>◎</span>No banned users</div>'; }
+/* ── Users ── */
+async function loadUsers() {
+  await Promise.all([loadLogs(), loadBannedSet()]);
+  buildUsers();
+  renderUsers();
 }
-async function banUser() {
-  const uid = v('banUserId');
-  if (!uid) { toast('Enter a user ID to ban', 'error'); return; }
-  try {
-    await dbPut(`/banned/${uid}`, true);
-    $('banUserId').value = '';
-    toast('User banned');
-    loadBans();
-  } catch { toast('Failed to ban user', 'error'); }
+async function loadBannedSet() {
+  try { const d = await dbGet('/banned'); bannedCache = d || {}; } catch { bannedCache = {}; }
+}
+function buildUsers() {
+  const map = {};
+  for (const e of logData) {
+    if (!e.localId) continue;
+    if (!map[e.localId]) map[e.localId] = { localId: e.localId, email: e.email || '?', firstSeen: e.timestamp, lastSeen: e.timestamp, hwids: new Set(), events: [] };
+    const u = map[e.localId];
+    if (e.email && e.email !== '?') u.email = e.email;
+    if (e.timestamp) { if (e.timestamp < u.firstSeen) u.firstSeen = e.timestamp; if (e.timestamp > u.lastSeen) u.lastSeen = e.timestamp; }
+    if (e.hwid) u.hwids.add(e.hwid);
+    u.events.push(e.event);
+  }
+  userCache = Object.values(map);
+}
+function renderUsers() {
+  const q = v('usersSearch').toLowerCase();
+  const list = $('usersList');
+  const filtered = userCache.filter(u => u.email.toLowerCase().includes(q) || u.localId.toLowerCase().includes(q));
+  if (!filtered.length) { list.innerHTML = '<div class="empty-state"><span>◎</span>No users found</div>'; return; }
+  list.innerHTML = filtered.map(u => {
+    const banned = !!bannedCache[u.localId];
+    const sharing = u.hwids.size > 1;
+    const last = u.lastSeen ? new Date(u.lastSeen * 1000).toLocaleString() : '?';
+    return `<div class="u-card" onclick="showUserLogs('${u.localId}')">
+      <span class="u-dot ${banned ? 'banned' : 'active'}"></span>
+      <div class="u-info">
+        <div class="u-email">${esc(u.email)}${sharing ? ' <span class="u-sharing">⚠ sharing</span>' : ''}</div>
+        <div class="u-meta">
+          <span>${esc(u.localId.substring(0, 16))}…</span>
+          <span>last: ${last}</span>
+          <span>${u.events.length} events</span>
+        </div>
+      </div>
+      <div class="u-actions">
+        ${banned
+          ? `<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();unbanUser('${u.localId}')" style="color:var(--success)">Unban</button>`
+          : `<button class="btn btn-danger btn-xs" onclick="event.stopPropagation();banUser('${u.localId}','${esc(u.email)}')">Ban</button>`
+        }
+      </div>
+    </div>`;
+  }).join('');
+}
+async function banUser(uid, email) {
+  if (!confirm(`Ban ${email || uid}?`)) return;
+  try { await dbPut(`/banned/${uid}`, true); toast('Banned: ' + (email || uid)); bannedCache[uid] = true; renderUsers(); } catch { toast('Failed to ban', 'error'); }
 }
 async function unbanUser(uid) {
   if (!confirm(`Unban ${uid}?`)) return;
-  try {
-    await dbPut(`/banned/${uid}`, null);
-    toast('User unbanned');
-    loadBans();
-  } catch { toast('Failed to unban', 'error'); }
+  try { await dbPut(`/banned/${uid}`, null); toast('Unbanned: ' + uid); delete bannedCache[uid]; renderUsers(); } catch { toast('Failed to unban', 'error'); }
+}
+function showUserLogs(localId) {
+  setLogFilter('all');
+  logFilter = 'all';
+  document.querySelectorAll('#logFilters button').forEach(b => b.style.background = 'transparent');
+  const allBtn = document.querySelector('#logFilters button[data-filter="all"]');
+  if (allBtn) allBtn.style.background = 'var(--raised)';
+  logData = logData.filter(e => e.localId === localId);
+  renderLogs();
+  $('logsList').scrollIntoView({ behavior: 'smooth' });
 }
 
 /* ── Logs ── */
-let logData = [], logFilter = 'all';
-
 async function loadLogs() {
   try {
     const d = await dbGet('/logs');
