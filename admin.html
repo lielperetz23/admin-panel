@@ -243,6 +243,16 @@ input::placeholder,textarea::placeholder{color:var(--sub);opacity:.6}
 .fetch-status.ok{color:var(--success)}
 .fetch-status.warn{color:var(--warn)}
 
+/* ── Bans ── */
+.ban-item{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--raised);border:1px solid var(--border);
+  border-radius:var(--r);padding:10px 13px;margin-top:6px;
+  font-size:12.5px;font-family:var(--mono);
+}
+.ban-item .bid{color:var(--text)}
+.ban-item .bdate{color:var(--sub);font-size:10.5px;margin-left:10px}
+
 /* ── Logs ── */
 .log-entry{
   background:var(--raised);
@@ -307,6 +317,7 @@ input::placeholder,textarea::placeholder{color:var(--sub);opacity:.6}
 .ei-name{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ei-x{background:none;border:none;cursor:pointer;color:var(--sub);font-size:16px;line-height:1;padding:0 2px;transition:color var(--t)}
 .ei-x:hover{color:var(--text)}
+.mt-8{margin-top:8px}
 
 .empty-state{
   text-align:center;padding:36px 0;
@@ -419,6 +430,7 @@ input::placeholder,textarea::placeholder{color:var(--sub);opacity:.6}
 
     <div class="fetch-row">
       <button class="btn btn-ghost btn-sm" onclick="fetchSteamDate()" id="fetchBtn">↓ Fetch CS2 Steam date</button>
+      <a href="https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=730&count=1" target="_blank" class="btn btn-ghost btn-xs" style="text-decoration:none">Steam API</a>
       <span class="fetch-status" id="fetchStatus"></span>
     </div>
   </div>
@@ -463,6 +475,21 @@ input::placeholder,textarea::placeholder{color:var(--sub);opacity:.6}
       </div>
       <button class="btn btn-primary" onclick="saveDiscord()" style="align-self:flex-end">Save</button>
     </div>
+  </div>
+
+  <!-- Bans -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Banned Users</span>
+    </div>
+    <div class="row">
+      <div class="field" style="margin-bottom:0">
+        <label>User Local ID</label>
+        <input type="text" id="banUserId" placeholder="Paste localId here…" style="margin-bottom:0">
+      </div>
+      <button class="btn btn-danger" onclick="banUser()" style="align-self:flex-end">Ban</button>
+    </div>
+    <div id="bannedList" class="mt-8"></div>
   </div>
 
   <!-- Logs -->
@@ -569,7 +596,7 @@ async function dbPut(path, data) {
   return r.json();
 }
 
-function loadAll() { return Promise.all([loadStatus(), loadAnn(), loadDiscord(), loadLogs()]); }
+function loadAll() { return Promise.all([loadStatus(), loadAnn(), loadDiscord(), loadLogs(), loadBans()]); }
 
 /* ── Status ── */
 async function loadStatus() {
@@ -720,6 +747,42 @@ async function loadDiscord() {
 async function saveDiscord() {
   try { await dbPut('/config/discord', {link: v('discordLink')}); toast('Discord link saved'); }
   catch { toast('Failed to save Discord link', 'error'); }
+}
+
+/* ── Bans ── */
+async function loadBans() {
+  try {
+    const d = await dbGet('/banned');
+    const list = $('bannedList');
+    if (!d || !Object.keys(d).length) {
+      list.innerHTML = '<div class="empty-state"><span>◎</span>No banned users</div>';
+      return;
+    }
+    list.innerHTML = Object.entries(d).map(([id, val]) =>
+      `<div class="ban-item">
+        <span class="bid">${esc(id)}</span>
+        <button class="btn btn-ghost btn-xs" onclick="unbanUser('${id}')" style="color:var(--danger)">Unban</button>
+      </div>`
+    ).join('');
+  } catch { $('bannedList').innerHTML = '<div class="empty-state"><span>◎</span>No banned users</div>'; }
+}
+async function banUser() {
+  const uid = v('banUserId');
+  if (!uid) { toast('Enter a user ID to ban', 'error'); return; }
+  try {
+    await dbPut(`/banned/${uid}`, true);
+    $('banUserId').value = '';
+    toast('User banned');
+    loadBans();
+  } catch { toast('Failed to ban user', 'error'); }
+}
+async function unbanUser(uid) {
+  if (!confirm(`Unban ${uid}?`)) return;
+  try {
+    await dbPut(`/banned/${uid}`, null);
+    toast('User unbanned');
+    loadBans();
+  } catch { toast('Failed to unban', 'error'); }
 }
 
 /* ── Logs ── */
