@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loader Admin Panel</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;background:#0a0a0b;color:#e1e1e3;display:flex;justify-content:center;min-height:100vh;padding:32px 16px}
+.container{max-width:680px;width:100%}
+
+/* Login */
+.login-wrap{max-width:400px;margin:120px auto 0;text-align:center}
+.login-wrap .logo{width:52px;height:52px;background:#5865F2;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:24px;font-weight:800;color:#fff}
+.login-wrap h1{font-size:24px;font-weight:700}
+.login-wrap .sub{color:#78787c;font-size:14px;margin:4px 0 28px}
+.in-grp{text-align:left;margin-bottom:14px}
+.in-grp label{display:block;font-size:12px;font-weight:600;color:#9a9a9e;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.in-grp input{width:100%;padding:12px 14px;background:#151517;border:1px solid #252528;border-radius:8px;color:#e1e1e3;font-size:14px;outline:none;transition:border .2s}
+.in-grp input:focus{border-color:#5865F2}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 24px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:.2s;font-family:inherit}
+.btn-primary{background:#5865F2;color:#fff;width:100%}.btn-primary:hover{background:#4752c4}
+.btn-primary:disabled,.btn-ghost:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{background:transparent;color:#9a9a9e;border:1px solid #252528}.btn-ghost:hover{border-color:#3a3a3e;color:#e1e1e3}
+.btn-danger{background:#da373c;color:#fff}.btn-danger:hover{background:#b0282c}
+.btn-sm{padding:7px 14px;font-size:12px}
+.error-msg{color:#f87171;font-size:13px;margin:-8px 0 16px;display:none;text-align:left}
+
+/* Dashboard */
+.dashboard{display:none}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.header-l h1{font-size:20px;font-weight:700}
+.header-l p{color:#78787c;font-size:13px}
+.section{background:#111113;border:1px solid #1e1e21;border-radius:12px;padding:22px;margin-bottom:16px}
+.section-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.section-h h2{font-size:12px;font-weight:700;color:#78787c;text-transform:uppercase;letter-spacing:1px}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-ok{background:#0d2e1a;color:#4ade80}
+.badge-warn{background:#2e240a;color:#facc15}
+.badge-info{background:#0d1e2e;color:#60a5fa}
+
+label.fl{display:block;font-size:12px;color:#78787c;margin-bottom:4px}
+input:not([type]),textarea,select{width:100%;padding:10px 12px;background:#1a1a1d;border:1px solid #252528;border-radius:6px;color:#e1e1e3;font-size:13px;margin-bottom:10px;font-family:inherit;outline:none;transition:border .2s}
+input:not([type]):focus,textarea:focus,select:focus{border-color:#5865F2}
+textarea{resize:vertical;min-height:60px}
+select{cursor:pointer}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.mt-8{margin-top:8px}.mb-0{margin-bottom:0}
+.ml-auto{margin-left:auto}
+
+/* Announcements List */
+.ann-list{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.ann-card{background:#161618;border-radius:8px;padding:14px;border:1px solid transparent;border-left:3px solid #5865F2;cursor:pointer;transition:all .15s}
+.ann-card:hover{border-color:#2a2a2e}
+.ann-card.selected{border-color:#5865F2;background:#1c1c20}
+.ann-card .t{font-weight:600;font-size:14px;color:#fff}
+.ann-card .d{font-size:11px;color:#78787c;margin-top:1px}
+.ann-card .b{font-size:13px;color:#b0b0b3;margin-top:6px;white-space:pre-wrap}
+.ann-card .act{display:flex;gap:6px;margin-top:8px;display:none}
+.ann-card.selected .act{display:flex}
+.empty-state{text-align:center;padding:32px 0;color:#555;font-size:13px}
+.editing-badge{display:none;align-items:center;gap:6px;margin-bottom:10px;font-size:12px;color:#60a5fa}
+.editing-badge.show{display:flex}
+.editing-badge .tag{background:#0d1e2e;padding:3px 10px;border-radius:4px;font-weight:600}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:500;color:#fff;z-index:999;opacity:0;transform:translateY(12px);transition:all .3s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast-success{background:#166534}
+.toast-error{background:#7f1d1d}
+
+/* Footer */
+.footer{text-align:center;color:#444;font-size:12px;margin-top:28px}
+
+@media(max-width:500px){
+  body{padding:16px 10px}
+  .container{max-width:100%}
+  .section{padding:16px}
+  .row{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginSection">
+  <div class="logo">A</div>
+  <h1>Admin Panel</h1>
+  <p class="sub">Sign in with your admin account</p>
+  <div class="error-msg" id="loginError"></div>
+  <div class="in-grp"><label>Email</label><input type="email" id="loginEmail" placeholder="admin@example.com" autocomplete="email"></div>
+  <div class="in-grp"><label>Password</label><input type="password" id="loginPassword" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password"></div>
+  <button class="btn btn-primary" id="loginBtn" onclick="login()">Sign In</button>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard" id="dashboardSection">
+  <div class="header">
+    <div class="header-l">
+      <h1>Admin Panel</h1>
+      <p id="adminEmail"></p>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="logout()">Sign Out</button>
+  </div>
+
+  <!-- Status -->
+  <div class="section">
+    <div class="section-h"><h2>Game Status</h2><span id="statusBadge"></span></div>
+    <label class="fl">compatibleDate (UNIX timestamp)</label>
+    <input id="statusDate" placeholder="e.g. 1779318374">
+    <label class="fl">Status message</label>
+    <input id="statusMsg" placeholder="Shown to users when maintenance is active">
+    <label class="fl">Update message</label>
+    <input id="statusUpdMsg" placeholder="Shown when loader version doesn't match">
+    <div class="row">
+      <select id="statusMode">
+        <option value="false">Normal</option>
+        <option value="true">Maintenance Mode</option>
+      </select>
+      <button class="btn btn-primary" onclick="saveStatus()">Save</button>
+    </div>
+    <button class="btn btn-ghost btn-sm mt-8" onclick="fetchSteamDate()" id="fetchBtn">Fetch latest CS2 Steam news date</button>
+  </div>
+
+  <!-- Announcements -->
+  <div class="section">
+    <div class="section-h"><h2>Announcements</h2></div>
+    <div class="editing-badge" id="editingBadge"><span class="tag">Editing</span> <span id="editingLabel"></span> <button class="btn btn-ghost btn-sm" onclick="clearEdit()" style="padding:2px 8px;font-size:11px;border:0;color:#9a9a9e;background:transparent;cursor:pointer">&times;</button></div>
+    <input id="annTitle" placeholder="Announcement title">
+    <textarea id="annBody" placeholder="Announcement body text"></textarea>
+    <div class="row">
+      <input id="annDate" placeholder="Date (e.g. 2026-05-21)">
+      <button class="btn btn-primary" id="annSaveBtn" onclick="saveAnnouncement()">+ Add</button>
+    </div>
+    <div class="ann-list" id="annList"></div>
+  </div>
+
+  <!-- Discord -->
+  <div class="section">
+    <div class="section-h"><h2>Discord Link</h2></div>
+    <div class="row">
+      <input id="discordLink" placeholder="https://discord.gg/...">
+      <button class="btn btn-primary" onclick="saveDiscord()">Save</button>
+    </div>
+  </div>
+
+  <div class="footer">Changes go live immediately &mdash; no rebuild needed.</div>
+</div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// == Config (obfuscated) ==
+var _$_=function(a){var r='';for(var i=0;i<a.length;i++){r+=String.fromCharCode(a[i]^56)};return r};
+var API_KEY=_$_([121,113,66,89,107,65,123,97,110,83,11,13,72,8,76,14,94,121,118,94,65,77,127,125,108,11,80,98,12,119,77,77,77,119,121,85,92,115,79]);
+var DB_URL=_$_([80,76,76,72,75,2,23,23,72,74,87,82,93,91,76,21,13,15,10,11,9,12,11,9,0,9,15,13,11,0,1,12,15,14,15,21,92,93,94,89,77,84,76,21,74,76,92,90,22,93,77,74,87,72,93,21,79,93,75,76,9,22,94,81,74,93,90,89,75,93,92,89,76,89,90,89,75,93,22,89,72,72]);
+var ADMIN_UID=_$_([82,110,111,106,118,12,13,80,109,117,108,8,114,106,118,109,105,64,75,125,111,89,81,1,117,105,76,9]);
+let token = null, email = null, editIdx = -1;
+
+function t(msg, type = 'success') {
+  const e = document.getElementById('toast');
+  e.textContent = msg; e.className = 'toast toast-' + type + ' show';
+  setTimeout(() => e.classList.remove('show'), 3000);
+}
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function $(id) { return document.getElementById(id); }
+function v(id) { return $(id).value.trim(); }
+
+// === Auth ===
+async function login() {
+  const e = v('loginEmail'), pw = v('loginPassword'), btn = $('loginBtn'), err = $('loginError');
+  if (!e || !pw) { err.textContent = 'Enter email and password'; err.style.display = 'block'; btn.focus(); return; }
+  err.style.display = 'none'; btn.disabled = true; btn.textContent = 'Signing in...';
+  try {
+    const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + API_KEY, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: e, password: pw, returnSecureToken: true })
+    });
+    const d = await r.json();
+    if (!r.ok) { err.textContent = d.error?.message || 'Login failed'; err.style.display = 'block'; btn.disabled = false; btn.textContent = 'Sign In'; return; }
+    if (d.localId !== ADMIN_UID) { err.textContent = 'Not an admin account'; err.style.display = 'block'; btn.disabled = false; btn.textContent = 'Sign In'; return; }
+    token = d.idToken; email = e;
+    $('adminEmail').textContent = 'Signed in as ' + email;
+    $('loginSection').style.display = 'none'; $('dashboardSection').style.display = 'block';
+    $('annDate').value = new Date().toISOString().slice(0, 10);
+    loadAll();
+  } catch (ex) { err.textContent = 'Connection error'; err.style.display = 'block'; }
+  btn.disabled = false; btn.textContent = 'Sign In';
+}
+function logout() { token = null; $('loginSection').style.display = 'block'; $('dashboardSection').style.display = 'none'; clearEdit(); }
+
+// === DB ===
+async function db(p) { const r = await fetch(DB_URL + p + '.json?auth=' + token); if (!r.ok) throw Error(r.status); return r.status === 204 ? null : await r.json(); }
+async function put(p, d) { const r = await fetch(DB_URL + p + '.json?auth=' + token, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) }); if (!r.ok) throw Error(r.status); return await r.json(); }
+
+// === Load All ===
+async function loadAll() { await Promise.all([loadStatus(), loadAnn(), loadDiscord()]); }
+
+// === Status ===
+async function loadStatus() {
+  try {
+    const d = await db('/config/status');
+    if (!d) return;
+    $('statusDate').value = d.compatibleDate || '';
+    $('statusMsg').value = d.message || '';
+    $('statusUpdMsg').value = d.updateMessage || '';
+    $('statusMode').value = d.updating ? 'true' : 'false';
+    const b = $('statusBadge');
+    if (d.updating) b.innerHTML = '<span class="badge badge-warn">Maintenance</span>';
+    else if (d.compatibleDate) b.innerHTML = '<span class="badge badge-ok">OK</span>';
+    else b.innerHTML = '<span class="badge badge-info">No version set</span>';
+  } catch (e) { t('Failed to load status', 'error'); }
+}
+async function saveStatus() {
+  const data = { compatibleDate: v('statusDate'), message: v('statusMsg'), updateMessage: v('statusUpdMsg'), updating: $('statusMode').value === 'true' };
+  try { await put('/config/status', data); t('Status saved'); loadStatus(); } catch (e) { t('Failed to save', 'error'); }
+}
+async function fetchSteamDate() {
+  const btn = $('fetchBtn'); btn.disabled = true; btn.textContent = 'Fetching...';
+  try {
+    const r = await fetch('https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=730&count=1');
+    const d = await r.json();
+    const ts = d?.appnews?.newsitems?.[0]?.date;
+    if (ts) { $('statusDate').value = ts; t('Got date: ' + ts); } else t('No news found', 'error');
+  } catch (e) { t('Failed to fetch from Steam', 'error'); }
+  btn.disabled = false; btn.textContent = 'Fetch latest CS2 Steam news date';
+}
+
+// === Announcements ===
+let annCache = [];
+
+async function loadAnn() {
+  try {
+    const d = await db('/config/announcements');
+    annCache = d?.items || [];
+    const list = $('annList');
+    if (!annCache.length) { list.innerHTML = '<div class="empty-state">No announcements yet.</div>'; return; }
+    list.innerHTML = annCache.map((x, i) =>
+      '<div class="ann-card' + (editIdx === i ? ' selected' : '') + '" onclick="selectAnn(' + i + ')" id="ac' + i + '">' +
+      '<div class="t">' + esc(x.title) + '</div>' +
+      '<div class="d">' + esc(x.date) + '</div>' +
+      '<div class="b">' + esc(x.body) + '</div>' +
+      '<div class="act">' +
+        '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();editAnn(' + i + ')">Edit</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();delAnn(' + i + ')">Delete</button>' +
+      '</div></div>'
+    ).join('');
+  } catch (e) { t('Failed to load announcements', 'error'); }
+}
+
+function selectAnn(i) {
+  if (editIdx === i) { clearEdit(); return; }
+  editIdx = i;
+  $('annSaveBtn').textContent = '+ Add';
+  clearForm();
+  renderAnnCards();
+  const c = document.getElementById('ac' + i);
+  if (c) c.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function editAnn(i) {
+  try {
+    if (!annCache[i]) return;
+    const x = annCache[i];
+    $('annTitle').value = x.title || '';
+    $('annBody').value = x.body || '';
+    $('annDate').value = x.date || '';
+    editIdx = i;
+    $('annSaveBtn').textContent = 'Update';
+    $('editingBadge').classList.add('show');
+    $('editingLabel').textContent = x.title;
+    renderAnnCards();
+  } catch (e) {}
+}
+
+function clearEdit() {
+  editIdx = -1;
+  $('annSaveBtn').textContent = '+ Add';
+  $('editingBadge').classList.remove('show');
+  clearForm();
+  renderAnnCards();
+}
+
+function clearForm() {
+  $('annTitle').value = '';
+  $('annBody').value = '';
+  $('annDate').value = new Date().toISOString().slice(0, 10);
+  $('editingBadge').classList.remove('show');
+}
+
+function renderAnnCards() {
+  const list = $('annList');
+  if (!annCache.length) { list.innerHTML = '<div class="empty-state">No announcements yet.</div>'; return; }
+  list.innerHTML = annCache.map((x, i) =>
+    '<div class="ann-card' + (editIdx === i ? ' selected' : '') + '" onclick="selectAnn(' + i + ')" id="ac' + i + '">' +
+    '<div class="t">' + esc(x.title) + '</div>' +
+    '<div class="d">' + esc(x.date) + '</div>' +
+    '<div class="b">' + esc(x.body) + '</div>' +
+    '<div class="act">' +
+      '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();editAnn(' + i + ')">Edit</button>' +
+      '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();delAnn(' + i + ')">Delete</button>' +
+    '</div></div>'
+  ).join('');
+}
+
+async function saveAnnouncement() {
+  const title = v('annTitle'), body = v('annBody'), date = v('annDate');
+  if (!title) { t('Title is required', 'error'); return; }
+  try {
+    const d = await db('/config/announcements');
+    const items = d?.items || [];
+    if (editIdx >= 0 && editIdx < items.length) {
+      items[editIdx] = { title, body, date };
+    } else {
+      items.push({ title, body, date });
+    }
+    await put('/config/announcements', { items });
+    editIdx = -1; $('annSaveBtn').textContent = '+ Add';
+    clearEdit();
+    t('Saved!');
+    loadAnn();
+  } catch (e) { t('Failed to save', 'error'); }
+}
+
+async function delAnn(i) {
+  if (!confirm('Delete this announcement?')) return;
+  try {
+    const d = await db('/config/announcements');
+    const items = d?.items || [];
+    items.splice(i, 1);
+    await put('/config/announcements', { items });
+    if (editIdx === i || editIdx > i) { editIdx = -1; $('annSaveBtn').textContent = '+ Add'; $('editingBadge').classList.remove('show'); }
+    t('Deleted');
+    loadAnn();
+  } catch (e) { t('Failed to delete', 'error'); }
+}
+
+// === Discord ===
+async function loadDiscord() { try { const d = await db('/config/discord'); $('discordLink').value = d?.link || ''; } catch (e) {} }
+async function saveDiscord() { try { await put('/config/discord', { link: v('discordLink') }); t('Discord link saved'); } catch (e) { t('Failed to save', 'error'); } }
+
+// === Enter to submit ===
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && $('loginSection').style.display !== 'none') login();
+});
+</script>
+</body>
+</html>
