@@ -69,6 +69,23 @@ select{cursor:pointer}
 .toast-success{background:#166534}
 .toast-error{background:#7f1d1d}
 
+/* Logs */
+.log-entry{background:#161618;border-radius:8px;padding:12px 14px;margin-bottom:6px;border-left:3px solid #555;font-size:13px;display:flex;flex-direction:column;gap:4px}
+.log-entry .le-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.log-entry .le-event{font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:2px 8px;border-radius:4px}
+.log-entry .le-email{color:#9ca3af;font-size:12px}
+.log-entry .le-msg{color:#b0b0b3;font-size:12px}
+.log-entry .le-time{color:#555;font-size:11px;margin-left:auto}
+.log-entry .le-hwid{color:#555;font-size:11px;font-family:monospace}
+.log-entry.event-hwid_mismatch{border-left-color:#da373c}
+.log-entry.event-hwid_mismatch .le-event{background:#2e0a0a;color:#f87171}
+.log-entry.event-login_blocked{border-left-color:#facc15}
+.log-entry.event-login_blocked .le-event{background:#2e240a;color:#facc15}
+.log-entry.event-login_success{border-left-color:#4ade80}
+.log-entry.event-login_success .le-event{background:#0d2e1a;color:#4ade80}
+.log-entry.event-hwid_bound{border-left-color:#60a5fa}
+.log-entry.event-hwid_bound .le-event{background:#0d1e2e;color:#60a5fa}
+
 /* Footer */
 .footer{text-align:center;color:#444;font-size:12px;margin-top:28px}
 
@@ -145,6 +162,22 @@ select{cursor:pointer}
     </div>
   </div>
 
+  <!-- Logs -->
+  <div class="section">
+    <div class="section-h">
+      <h2>Activity Logs</h2>
+      <button class="btn btn-ghost btn-sm" onclick="refreshLogs()" id="logRefreshBtn" style="padding:4px 10px;font-size:11px">Refresh</button>
+    </div>
+    <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap" id="logFilters">
+      <button class="btn btn-ghost btn-sm" data-filter="all" onclick="setLogFilter('all')" style="background:#1e1e20;padding:3px 10px;font-size:11px">All</button>
+      <button class="btn btn-ghost btn-sm" data-filter="hwid_mismatch" onclick="setLogFilter('hwid_mismatch')" style="padding:3px 10px;font-size:11px;color:#f87171">Sharing</button>
+      <button class="btn btn-ghost btn-sm" data-filter="login_blocked" onclick="setLogFilter('login_blocked')" style="padding:3px 10px;font-size:11px;color:#facc15">Blocked</button>
+      <button class="btn btn-ghost btn-sm" data-filter="login_success" onclick="setLogFilter('login_success')" style="padding:3px 10px;font-size:11px;color:#4ade80">Logins</button>
+      <button class="btn btn-ghost btn-sm" data-filter="hwid_bound" onclick="setLogFilter('hwid_bound')" style="padding:3px 10px;font-size:11px;color:#60a5fa">Bindings</button>
+    </div>
+    <div id="logsList"></div>
+  </div>
+
   <div class="footer">Changes go live immediately &mdash; no rebuild needed.</div>
 </div>
 
@@ -196,7 +229,7 @@ async function db(p) { const r = await fetch(DB_URL + p + '.json?auth=' + token)
 async function put(p, d) { const r = await fetch(DB_URL + p + '.json?auth=' + token, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) }); if (!r.ok) throw Error(r.status); return await r.json(); }
 
 // === Load All ===
-async function loadAll() { await Promise.all([loadStatus(), loadAnn(), loadDiscord()]); }
+async function loadAll() { await Promise.all([loadStatus(), loadAnn(), loadDiscord(), loadLogs()]); }
 
 // === Status ===
 async function loadStatus() {
@@ -340,6 +373,61 @@ async function delAnn(i) {
 // === Discord ===
 async function loadDiscord() { try { const d = await db('/config/discord'); $('discordLink').value = d?.link || ''; } catch (e) {} }
 async function saveDiscord() { try { await put('/config/discord', { link: v('discordLink') }); t('Discord link saved'); } catch (e) { t('Failed to save', 'error'); } }
+
+// === Logs ===
+let logData = [], logFilter = 'all';
+
+async function loadLogs() {
+  try {
+    const d = await db('/logs');
+    logData = [];
+    if (d) {
+      for (const key in d) {
+        if (d.hasOwnProperty(key)) {
+          const entry = d[key];
+          entry._key = key;
+          logData.push(entry);
+        }
+      }
+      logData.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    }
+    renderLogs();
+  } catch (e) { /* logs may not exist yet */ }
+}
+
+function setLogFilter(filter) {
+  logFilter = filter;
+  document.querySelectorAll('#logFilters button').forEach(b => b.style.background = 'transparent');
+  const btn = document.querySelector('#logFilters button[data-filter="' + filter + '"]');
+  if (btn) btn.style.background = '#1e1e20';
+  renderLogs();
+}
+
+function renderLogs() {
+  const list = $('logsList');
+  const filtered = logFilter === 'all' ? logData : logData.filter(e => e.event === logFilter);
+  if (!filtered.length) { list.innerHTML = '<div class="empty-state">No logs yet.</div>'; return; }
+  list.innerHTML = filtered.slice(0, 100).map(e => {
+    const ts = e.timestamp ? new Date(e.timestamp * 1000).toLocaleString() : '?';
+    return '<div class="log-entry event-' + (e.event || 'unknown') + '">' +
+      '<div class="le-h">' +
+        '<span class="le-event">' + esc(e.event || '?') + '</span>' +
+        '<span class="le-email">' + esc(e.email || '') + '</span>' +
+        '<span class="le-time">' + ts + '</span>' +
+      '</div>' +
+      '<div class="le-msg">' + esc(e.message || '') + '</div>' +
+      (e.hwid ? '<div class="le-hwid">' + esc(e.hwid.substring(0, 16)) + '...</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+async function refreshLogs() {
+  const btn = $('logRefreshBtn');
+  btn.textContent = 'Refreshing...'; btn.disabled = true;
+  await loadLogs();
+  btn.textContent = 'Refresh'; btn.disabled = false;
+  t('Logs updated');
+}
 
 // === Enter to submit ===
 document.addEventListener('keydown', function(e) {
